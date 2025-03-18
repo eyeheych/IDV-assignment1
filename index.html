@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singapore PSI Readings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #181818;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .status {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .healthy {
+            color: #00ff00;
+        }
+
+        .unhealthy {
+            color: #ff0000;
+        }
+
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background: #252525;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        th {
+            background: #333;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background: #2b2b2b;
+        }
+
+        h2 {
+            color: #ffcc00;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>API Status: <span id="apiStatus" class="status">Loading...</span></h2>
+    <h2>Last Updated: <span id="lastUpdated">Loading...</span></h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Central</th>
+                <th>West</th>
+                <th>East</th>
+                <th>North</th>
+                <th>South</th>
+            </tr>
+        </thead>
+        <tbody id="dataTable">
+            <!-- Data will be inserted dynamically -->
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const API_URL = "https://api.data.gov.sg/v1/environment/psi";
+
+            async function fetchData() {
+                try {
+                    console.log("Fetching data..."); // Debugging log
+
+                    const response = await fetch(API_URL);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log("API Response:", data); // Debugging log
+
+                    // Check API status
+                    const apiStatus = data.api_info.status;
+                    updateStatus(apiStatus);
+
+                    if (!data.items || data.items.length === 0) {
+                        throw new Error("No data found in API response");
+                    }
+
+                    const latestReading = data.items[0].readings;
+                    const timestamp = new Date(data.items[0].timestamp).toLocaleString();
+
+                    updateTable(latestReading, timestamp);
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                    document.getElementById("apiStatus").textContent = "Unhealthy";
+                    document.getElementById("apiStatus").className = "status unhealthy";
+                    document.getElementById("lastUpdated").textContent = "Failed to load data";
+                }
+            }
+
+            function updateStatus(status) {
+                const statusElement = document.getElementById("apiStatus");
+                if (status === "healthy") {
+                    statusElement.textContent = "Healthy";
+                    statusElement.className = "status healthy";
+                } else {
+                    statusElement.textContent = "Unhealthy";
+                    statusElement.className = "status unhealthy";
+                }
+            }
+
+            function updateTable(readings, timestamp) {
+                const tableBody = document.getElementById("dataTable");
+                tableBody.innerHTML = ""; // Clear existing table
+
+                // Define the required metrics
+                const metrics = [
+                    "o3_sub_index", "pm10_twenty_four_hourly", "pm10_sub_index", "co_sub_index",
+                    "pm25_twenty_four_hourly", "so2_sub_index", "co_eight_hour_max", "no2_one_hour_max",
+                    "so2_twenty_four_hourly", "pm25_sub_index", "psi_twenty_four_hourly", "o3_eight_hour_max"
+                ];
+
+                metrics.forEach(metric => {
+                    const row = document.createElement("tr");
+
+                    const metricCell = document.createElement("td");
+                    metricCell.textContent = metric;
+                    row.appendChild(metricCell);
+
+                    ["central", "west", "east", "north", "south"].forEach(region => {
+                        const cell = document.createElement("td");
+                        cell.textContent = readings[metric] && readings[metric][region] !== undefined 
+                            ? readings[metric][region] 
+                            : "-"; // Fill data or placeholder
+                        row.appendChild(cell);
+                    });
+
+                    tableBody.appendChild(row);
+                });
+
+                // Update timestamp
+                document.getElementById("lastUpdated").textContent = timestamp;
+            }
+
+            fetchData(); // Fetch immediately on page load
+            setInterval(fetchData, 30000); // Refresh every 30 seconds
+        });
+    </script>
+
+</body>
+</html>
